@@ -1,0 +1,60 @@
+var Hello = {
+	connection: null,
+	log: function (msg) {
+		$('#log').append("<p>" + msg + "</p>");
+	},
+	send_ping: function (to) {
+		var ping = $iq({to: to,	type: "get", id: "ping1"}).c("ping", {xmlns: "urn:xmpp:ping"});
+		Hello.connection.send(ping);
+	},
+	handle_pong: function (iq) {
+		Hello.connection.disconnect();
+		return false;
+	}
+};
+
+$(document).ready(function () {
+	$('#login_dialog').dialog({
+		autoOpen: true,
+		draggable: false,
+		modal: true,
+		title: 'Connect to XMPP',
+		buttons: {
+			"Connect": function () {
+				$(document).trigger('connect', {
+					jid: "userID",
+					password: "password"
+				});
+				$('#password').val('');
+				$(this).dialog('close');
+			}
+		}
+	});
+});
+
+$(document).bind('connect', function (ev, data) {
+	var conn = new Strophe.Connection(
+	"http://127.0.0.1/bosh");
+	conn.connect(data.jid, data.password, function (status) {
+	console.log(status);
+		if (status === Strophe.Status.CONNECTED) {
+			$(document).trigger('connected');
+		} else if (status === Strophe.Status.DISCONNECTED) {
+			$(document).trigger('disconnected');
+		}
+	});
+	Hello.connection = conn;
+});
+
+
+$(document).bind('connected', function () {
+	Hello.log("Connection established.");
+	Hello.connection.addHandler(Hello.handle_pong,null, "iq", null, "ping1");
+	var domain = Strophe.getDomainFromJid(Hello.connection.jid);
+	Hello.send_ping(domain);
+});
+
+$(document).bind('disconnected', function () {
+	Hello.log("Connection terminated.");	
+	Hello.connection = null;
+});
